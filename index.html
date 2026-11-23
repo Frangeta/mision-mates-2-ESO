@@ -1045,6 +1045,7 @@ function drawSteps(){
    <div class="rule"><span class="ri" aria-hidden="true">${rl.ico}</span><span><b>Paso ${CUR.lines.length+1}:</b> calcula lo marcado. ${rl.where}<br><small>${rl.txt}</small></span></div>${hintBox(hints,needsLCD(c)?'<button class="btn sm" id="toLCD">🧮 Desglosar: m.c.m. y convertir</button>':'')}`;
   bindHint(hints,()=>{drawSteps();});
   const tl=$('#toLCD');if(tl)tl.onclick=()=>{CUR.forceSub=c.node.id;CUR.skipSub=null;drawSteps();};
+  {const fk=$('#pad [data-k="frac"]');if(fk)fk.disabled=false;}
   if(!$('#pad').innerHTML){$('#pad').innerHTML=padH({small:true});bindPad(checkStep,false);}
   const nb=$('.notebook');if(nb)nb.scrollTop=nb.scrollHeight;
 }
