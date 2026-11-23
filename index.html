@@ -24,7 +24,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--pen);outline-offset:2px}
 .wrap{max-width:680px;margin:0 auto;padding:18px 16px 110px}
-.wrap.prac{padding-bottom:24px}
+.wrap.prac{padding-bottom:0}
+.dock{position:sticky;bottom:0;z-index:5;background:var(--paper);margin:0 -16px;padding:4px 16px calc(10px + env(safe-area-inset-bottom,0px));box-shadow:0 -12px 14px -14px rgba(29,39,66,.45)}
+.dock .fbline{margin:4px 4px 8px;min-height:1.4em}
+.dock .solbox{max-height:34vh;overflow:auto}
+.prac .excard{margin-bottom:10px}
+@media (max-height:800px){.k{padding:8px 0;font-size:1.2rem}.ansbox{min-height:56px;margin-bottom:8px}.ansbox.small{min-height:50px}.ans{font-size:1.7rem}.keys{gap:6px}.ptitle{margin-bottom:4px;font-size:.82rem}.excard{padding:12px 14px}.prompt{font-size:.95rem}.rule{font-size:.88rem;padding:6px 10px}.topbar{margin-bottom:6px}}
 .hand{font-family:var(--hand);font-weight:700;letter-spacing:.2px;line-height:1.05}
 h1.hand{font-size:2.6rem;margin:.1em 0 .15em}h2.hand{font-size:1.9rem;margin:.6em 0 .3em}
 .t-b{--tone:var(--hb)}.t-p{--tone:var(--hp)}
@@ -209,6 +214,22 @@ svg.bar{width:100%;max-width:560px}svg.bar rect{stroke:var(--ink);stroke-width:1
 @keyframes fall{to{top:105vh;transform:rotate(720deg) translateX(40px)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:420px){h1.hand{font-size:2.2rem}.mline,.nl2{font-size:1.15rem}.big2{font-size:1.3rem}.node{transform:translateX(calc(var(--off)*30px))}.k{padding:10px 0}.ansbox{min-height:62px}}
+
+/* asistente de denominador común */
+.lcd{margin-top:12px;border:2px solid var(--ink);border-radius:14px;background:var(--paper);padding:10px 12px;box-shadow:0 3px 0 var(--ink)}
+.lcdh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:900;font-size:.95rem;margin-bottom:4px}
+.lcdh small{font-weight:700;color:var(--ink2)}
+.lrow{display:flex;align-items:center;gap:10px;padding:6px 4px;border-radius:10px;font-weight:800;font-size:1.15rem;flex-wrap:wrap}
+.lrow .lt2{font-size:.78rem;font-weight:800;color:var(--ink2);min-width:100%;margin-bottom:-4px}
+.lrow.done{opacity:.75}.lrow.done .okv{color:var(--ok)}
+.lrow.now{background:color-mix(in srgb,var(--hy) 35%,transparent)}
+.qbox{display:inline-grid;place-items:center;min-width:1.8em;height:1.5em;padding:0 .2em;border:2px dashed var(--ink);border-radius:6px;background:var(--card);color:var(--ink2)}
+.lrow.now .qbox{border-style:solid;border-color:var(--pen);color:var(--pen);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--pen) 25%,transparent)}}
+.okv{font-variant-numeric:tabular-nums}
+.hit{background:var(--hy);color:var(--onhl);border-radius:4px;padding:0 3px;font-weight:900}
+.rej td.l{text-align:left;font-weight:600}
+.lcdbtn{margin-top:10px}
 </style></head>
 <body><div id="app"></div>
 <script>
@@ -277,6 +298,7 @@ function rd(n,ctx='top',hl=null){
       h=parts.join('');break;}
     case 'g':{const[o,c]=n.k==='['?['[',']']:['(',')'];h=`<span class="pa">${o}</span>${rd(n.e,'top',hl)}<span class="pa">${c}</span>`;break;}
     case 'w':{let b;if(n.b.t==='n'){const f=n.b.v.n<0||n.b.v.d!==1;b=f?`<span class="pa">(</span>${qH(n.b.v)}<span class="pa">)</span>`:qH(n.b.v);}else b=rd(n.b,'top',hl);h=`<span class="pw">${b}<sup>${n.e}</sup></span>`;break;}
+    case 'h':h=n.html;break;
     case 'r':h=`<span class="rt"><span class="rs">√</span><span class="rad">${rd(n.e,'top',hl)}</span></span>`;break;
   }
   if(hl&&hl.id===n.id)h=`<span class="hl">${h}</span>`;
@@ -390,6 +412,13 @@ function diagnose(u,ans,c){
   if(ans.d===1&&u.d===1&&Math.abs(u.n-ans.n)<=2)return 'Estás muy cerca. Repasa la cuenta con calma.';
   return pick(['Todavía no. Mira la pista si la necesitas.','No es eso. Vuelve a mirar los signos.','Casi nadie lo saca a la primera. Prueba otra vez.']);
 }
+
+/* ===== utilidades para el asistente de denominador común ===== */
+function subst(root,id,nn){const rep=n=>{if(n.id===id)return nn;switch(n.t){case 's':return{...n,terms:n.terms.map(t=>({s:t.s,n:rep(t.n)}))};case 'p':return{...n,terms:n.terms.map(t=>({op:t.op,n:rep(t.n)}))};case 'g':return{...n,e:rep(n.e)};case 'w':return{...n,b:rep(n.b)};case 'r':return{...n,e:rep(n.e)};default:return n;}};return rep(root);}
+function needsLCD(c){if(!c||c.kind!=='sum')return false;const v=sumVals(c.node);return v.some(x=>x.d!==1)&&uniq(v.map(x=>x.d)).length>1;}
+function factStr(n){const f=[];let m=n;for(let p=2;p*p<=m;p++){let e=0;while(m%p===0){m/=p;e++;}if(e)f.push(p+(e>1?`<sup>${e}</sup>`:''));}if(m>1)f.push(m);return f.join(' · ')||'1';}
+function multList(d,upto,L){const arr=[];for(let v=d;v<=upto;v+=d)arr.push(v===L?`<span class="hit">${v}</span>`:v);return arr.join(', ');}
+function numsExpr(nums){return nums.map((x,i)=>(x<0?(i?` ${M} `:M):(i?' + ':''))+Math.abs(x)).join('');}
 /* ================== GENERADORES DE EJERCICIOS ================== */
 const NAMES=['Lucía','Martina','Carla','Sofía','Hugo','Leo','Daniela','Álex','Noa','Mario','Vera','Iker','Paula','Nora'];
 function astInput(ast,prompt='Calcula:',o={}){
@@ -593,7 +622,7 @@ function gF4(L){
     if(L===1){const t=[rf(D1,9),rf(D1,9)];const n=R(1,5);const pos=R(0,2);const ts=[[1,N(t[0])],[sgn(),N(t[1])]];ts.splice(pos,0,[pos?sgn():1,N(n)]);return S(...ts);}
     const a=rf(D1,9),b=rf(D1,7),c=rf(D1,7);return Math.random()<.5?S([1,N(a)],[1,N(neg(b),{p:false})],[-1,N(neg(c))]):S([1,N(R(1,4))],[-1,G(S([1,N(b)],[-1,N(c)]))],[sgn(),N(a)]);
   });
-  return astInput(ast,'Calcula y da el resultado simplificado:');
+  return{type:'steps',prompt:'Calcula y simplifica. Primero igualamos denominadores.',ast,guided:L<2};
 }
 function gF5(L){
   const D=[2,3,4,5,6,7,8,9,10,12];
@@ -644,13 +673,13 @@ function gF8(L){
       inp('',N0-a*u,{q:'¿Y cuántos chicos?',hints:['Lo que falta hasta el total. Otra forma: los chicos son '+fH(b-a,b)+' de la clase.'],sol:`${N0} − ${a*u} = ${N0-a*u}`})]};},
     extra:()=>{let f1,f2;do{f1=rf([3,4,5,6],3);f2=rf([3,4,5,6,10],3);}while(f1.d===f2.d||qv(f1)+qv(f2)>=0.95);const Lm=lcm(f1.d,f2.d);const T0=Lm*R(2,8);const r=sub(Q(1),add(f1,f2));const n1=T0*f1.n/f1.d,n2=T0*f2.n/f2.d;
       return{story:`En un instituto hay ${T0} alumnos apuntados a actividades. ${fH(f1.n,f1.d)} hacen baloncesto, ${fH(f2.n,f2.d)} hacen teatro y el resto hace robótica.`,data:[`Total: ${T0}`,`Baloncesto: ${qH(f1)}`,`Teatro: ${qH(f2)}`,'Robótica: el resto'],bar:Lm<=40?barSVG(Lm,[{u:f1.n*Lm/f1.d,l:'baloncesto'},{u:f2.n*Lm/f2.d,l:'teatro'},{u:r.n*Lm/r.d,l:'robótica'}]):'',parts:[
-      inp('',add(f1,f2),{q:'¿Qué fracción hace baloncesto o teatro?',hints:[`Suma ${qH(f1)} + ${qH(f2)} con denominador común ${Lm}.`],sol:`${qH(f1)} + ${qH(f2)} = ${qH(add(f1,f2))}`}),
-      inp('',r,{q:'¿Qué fracción hace robótica?',hints:['"El resto" es lo que falta para llegar al total, que es 1 (la unidad).',`1 − ${qH(add(f1,f2))}`],sol:`1 − ${qH(add(f1,f2))} = ${qH(r)}`}),
+      inp('',add(f1,f2),{sum:[f1,f2],q:'¿Qué fracción hace baloncesto o teatro?',hints:[`Suma ${qH(f1)} + ${qH(f2)} con denominador común ${Lm}.`],sol:`${qH(f1)} + ${qH(f2)} = ${qH(add(f1,f2))}`}),
+      inp('',r,{sum:[Q(1),neg(add(f1,f2))],q:'¿Qué fracción hace robótica?',hints:['"El resto" es lo que falta para llegar al total, que es 1 (la unidad).',`1 − ${qH(add(f1,f2))}`],sol:`1 − ${qH(add(f1,f2))} = ${qH(r)}`}),
       inp('',T0*r.n/r.d,{q:'¿Cuántos alumnos hacen robótica?',hints:[`Calcula ${qH(r)} de ${T0}: reparte entre ${r.d} y coge ${r.n}.`],sol:`${T0} : ${r.d} = ${T0/r.d} → · ${r.n} = ${T0*r.n/r.d}`})]};},
     tarta:()=>{let f1,f2;do{f1=rf([3,4,6,8],3);f2=rf([3,4,6,8,12],3);}while(f1.d===f2.d||qv(f1)+qv(f2)>=0.9);const Lm=lcm(f1.d,f2.d);const Tz=Lm*pick([1,2]);const e=add(f1,f2),q=sub(Q(1),e);
       return{story:`${nm} se come ${qH(f1)} de una pizza y su hermano ${qH(f2)}. La pizza estaba cortada en ${Tz} trozos iguales.`,data:[`${nm}: ${qH(f1)}`,`Hermano: ${qH(f2)}`,`${Tz} trozos`],bar:Lm<=40?barSVG(Lm,[{u:f1.n*Lm/f1.d,l:nm},{u:f2.n*Lm/f2.d,l:'hermano'},{u:q.n*Lm/q.d,l:'queda'}]):'',parts:[
-      inp('',e,{q:'¿Qué fracción de pizza se han comido entre los dos?',hints:[`m.c.m.(${f1.d}, ${f2.d}) = ${Lm}.`],sol:`${qH(f1)} + ${qH(f2)} = ${qH(e)}`}),
-      inp('',q,{q:'¿Qué fracción queda?',hints:['La pizza entera es 1.'],sol:`1 − ${qH(e)} = ${qH(q)}`}),
+      inp('',e,{sum:[f1,f2],q:'¿Qué fracción de pizza se han comido entre los dos?',hints:[`m.c.m.(${f1.d}, ${f2.d}) = ${Lm}.`],sol:`${qH(f1)} + ${qH(f2)} = ${qH(e)}`}),
+      inp('',q,{sum:[Q(1),neg(e)],q:'¿Qué fracción queda?',hints:['La pizza entera es 1.'],sol:`1 − ${qH(e)} = ${qH(q)}`}),
       inp('',Tz*q.n/q.d,{q:'¿Cuántos trozos quedan?',hints:[`${qH(q)} de ${Tz}.`],sol:`${Tz} : ${q.d} · ${q.n} = ${Tz*q.n/q.d} trozos`})]};},
     total:()=>{const c=pick([['páginas','Lleva leídas','de un libro','¿Cuántas páginas tiene el libro?'],['km','Ha recorrido','de una ruta en bici','¿Cuántos kilómetros tiene la ruta?'],['€','Ha ahorrado','del dinero que necesita para unos cascos','¿Cuánto cuestan los cascos?']]);const b=pick([3,4,5,6,7,8]),a=coprime(b),u=R(3,25);const X=a*u;
       return{story:`${c[1]} ${X} ${c[0]}, que son los ${fH(a,b)} ${c[2]}.`,data:[`${X} ${c[0]} = ${fH(a,b)}`],bar:barSVG(b,[{u:a,l:`${X} ${c[0]}`},{u:b-a,l:'?'}]),parts:[
@@ -658,8 +687,8 @@ function gF8(L){
       inp('',u*b,{q:c[3],unit:c[0],hints:[`El total son ${b} partes de ${u}.`],sol:`${u} · ${b} = ${u*b}`})]};},
     viaje:()=>{let f1,f2;do{f1=rf([2,3,4,5],2);f2=rf([3,4,5,6,8],3);}while(f1.d===f2.d||qv(f1)+qv(f2)>=0.9);const Lm=lcm(f1.d,f2.d),T0=Lm*R(1,4),u=add(f1,f2),r=sub(Q(1),u),Rd=T0*r.n/r.d,one=Rd/r.n;
       return{story:`${nm} hace un viaje: pasa ${qH(f1)} del tiempo en Galicia, ${qH(f2)} en Asturias y los ${Rd} días restantes en Cantabria.`,data:[`Galicia: ${qH(f1)}`,`Asturias: ${qH(f2)}`,`Cantabria: ${Rd} días`],bar:Lm<=40?barSVG(Lm,[{u:f1.n*Lm/f1.d,l:'Galicia'},{u:f2.n*Lm/f2.d,l:'Asturias'},{u:r.n*Lm/r.d,l:`${Rd} días`}]):'',parts:[
-      inp('',u,{q:'¿Qué fracción del viaje pasa entre Galicia y Asturias?',hints:[`Suma con denominador ${Lm}.`],sol:`${qH(f1)} + ${qH(f2)} = ${qH(u)}`}),
-      inp('',r,{q:`¿Qué fracción del viaje son los ${Rd} días de Cantabria?`,hints:['Lo que falta hasta 1.'],sol:`1 − ${qH(u)} = ${qH(r)}`}),
+      inp('',u,{sum:[f1,f2],q:'¿Qué fracción del viaje pasa entre Galicia y Asturias?',hints:[`Suma con denominador ${Lm}.`],sol:`${qH(f1)} + ${qH(f2)} = ${qH(u)}`}),
+      inp('',r,{sum:[Q(1),neg(u)],q:`¿Qué fracción del viaje son los ${Rd} días de Cantabria?`,hints:['Lo que falta hasta 1.'],sol:`1 − ${qH(u)} = ${qH(r)}`}),
       inp('',one,{q:`¿Cuántos días es 1/${r.d} del viaje?`,hints:[`${qH(r)} son ${Rd} días → 1/${r.d} son ${Rd} : ${r.n}.`],sol:`${Rd} : ${r.n} = ${one}`}),
       inp('',T0,{q:'¿Cuántos días dura el viaje entero?',hints:[`El viaje entero son ${r.d} partes.`],sol:`${one} · ${r.d} = ${T0} días`})]};},
     fracfrac:()=>{const a=pick([[2,3],[3,4],[3,5],[2,5],[4,5],[5,6]]),c=pick([[1,2],[1,3],[2,3],[3,4],[1,4],[5,6]]);const f1=Q(...a),f2=Q(...c),pr=mul(f1,f2);const T0=lcm(f1.d*f2.d,1)*R(1,5);
@@ -677,7 +706,7 @@ function gF8(L){
       return{story:`Una pastelería vende por la mañana ${fH(a,b)} de sus cruasanes. Por la tarde vende ${fH(c,d)} de los que quedaban. Al cerrar le sobran ${left} cruasanes.`,data:[`Mañana: ${fH(a,b)} del total`,`Tarde: ${fH(c,d)} de lo que quedaba`,`Sobran: ${left}`],bar:b*d<=40?barSVG(b*d,[{u:a*d,l:'mañana'},{u:c*(b-a),l:'tarde'},{u:(d-c)*(b-a),l:`${left} sobran`}]):'',parts:[
       inp('',f1,{q:'¿Qué fracción del total queda después de la mañana?',hints:['1 − lo vendido.'],sol:`1 − ${fH(a,b)} = ${qH(f1)}`}),
       inp('',f2,{q:'¿Qué fracción del <b>total</b> vende por la tarde?',hints:[`${fH(c,d)} <b>de</b> ${qH(f1)} → multiplica.`],sol:`${fH(c,d)} · ${qH(f1)} = ${qH(f2)}`}),
-      inp('',fr,{q:'¿Qué fracción del total sobra?',hints:[`${qH(f1)} − ${qH(f2)}`],sol:`${qH(f1)} − ${qH(f2)} = ${qH(fr)}`}),
+      inp('',fr,{sum:[f1,neg(f2)],q:'¿Qué fracción del total sobra?',hints:[`${qH(f1)} − ${qH(f2)}`],sol:`${qH(f1)} − ${qH(f2)} = ${qH(fr)}`}),
       inp('',T0,{q:'¿Cuántos cruasanes había al principio?',hints:[`Si ${qH(fr)} son ${left}, 1/${fr.d} son ${left} : ${fr.n} = ${left/fr.n}.`,`Total = ${left/fr.n} · ${fr.d}`],sol:`${left} : ${fr.n} · ${fr.d} = ${T0} cruasanes`})]};},
     deposito:()=>{const b=pick([2,3,4,5]),a=coprime(b),d=pick([3,4,5]),c=coprime(d);const C=b*d*R(2,12)*5;const hay=C*a/b,usa=hay*c/d,qd=hay-usa;
       return{story:`Un depósito de ${C} litros está lleno hasta ${fH(a,b)}. Para regar se gastan ${fH(c,d)} del agua que había.`,data:[`Capacidad: ${C} L`,`Lleno: ${fH(a,b)}`,`Se gasta: ${fH(c,d)} de lo que hay`],parts:[
@@ -753,6 +782,7 @@ const WORLDS=[
  {id:'F4',t:'Sumar y restar',ico:'🧩',d:'Denominador común, también con enteros y signos.',gen:gF4,n:6,th:()=>[
   {h:'Mismo denominador',b:`Se suman o restan los numeradores y el denominador se queda igual:`+ex(`${fH(2,7)} + ${fH(3,7)} = ${fH(5,7)}`)+ojo('Los denominadores <b>nunca</b> se suman: '+fH(1,2)+' + '+fH(1,2)+' no es '+fH(2,4)+'.')},
   {h:'Distinto denominador',b:ex(rd(S([1,Nq(2,3)],[-1,N(2)],[1,Nq(7,8)])))+tbl([['Fracción',fH(2,3),'2 = '+fR(2,1),fH(7,8)],['× cuánto (hasta 24)','× 8','× 24','× 3'],['Equivalente',fH(16,24),fH(48,24),fH(21,24)]])+ex(`${fR('16 − 48 + 21',24)} = ${qH(Q(-11,24))}`)+abn('un entero es una fracción con denominador 1.')},
+  {h:'La calculadora de denominador común',b:`Cuando hay que sumar o restar con denominadores distintos, la app lo trocea en pasos pequeños:`+tbl([['1. m.c.m.','m.c.m.(2, 9) = <b>18</b>'],['2. Convierto',`${fH(1,2)} = ${fH(9,18)} &nbsp; ${fH(8,9)} = ${fH(16,18)}`],['3. Opero arriba',`${fR('9 − 16',18)} = ${qH(Q(-7,18))}`],['4. ¿Simplifico?','m.c.d.(7, 18) = 1 → ya es irreducible']])+abn('así no hay que pensarlo todo de golpe: cada paso es una cuenta pequeña.')},
   {h:'Con signos y paréntesis',b:`Las reglas de los enteros siguen valiendo:`+solHTML(S([1,Nq(9,2)],[1,N(Q(-5,4))],[-1,N(Q(-4,5))]))}]},
  {id:'F5',t:'Multiplicar y dividir',ico:'🔁',d:'Producto, inversa y división de fracciones.',gen:gF5,n:6,th:()=>[
   {h:'Multiplicar',b:`Numerador por numerador y denominador por denominador:`+ex(`${fH(5,9)} · ${fH(7,6)} = ${fR('5·7','9·6')} = ${fH(35,54)}`)+abn('simplifica <b>antes</b> de multiplicar: si un número de arriba y otro de abajo comparten divisor, divídelos ya. Las cuentas salen más pequeñas.')},
@@ -776,7 +806,7 @@ const ALL=WORLDS.flatMap(w=>w.lessons.map(l=>({...l,world:w})));
 const LBY=Object.fromEntries(ALL.map(l=>[l.id,l]));
 /* ================== ESTADO ================== */
 const KEY='misionMates2eso_v1';
-const DEF=()=>({name:'',xp:0,streak:0,lastDay:'',day:'',dayXP:0,lessons:{},badges:[],mistakes:[],stats:{ok:0,tot:0,steps:0,longs:0,probs:0,best60:0,reviewOk:0,maxCombo:0},unlockAll:false,sound:true});
+const DEF=()=>({name:'',xp:0,streak:0,lastDay:'',day:'',dayXP:0,lessons:{},badges:[],mistakes:[],stats:{ok:0,tot:0,steps:0,longs:0,probs:0,best60:0,reviewOk:0,maxCombo:0},unlockAll:false,sound:true,lcdHelp:true});
 let ST=(()=>{try{const s=JSON.parse(localStorage.getItem(KEY));return s?Object.assign(DEF(),s,{stats:Object.assign(DEF().stats,s.stats||{})}):DEF();}catch(e){return DEF();}})();
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(ST));}catch(e){}};
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
@@ -828,7 +858,7 @@ function starsH(n,max=3){return `<span class="stars" aria-label="${n} de ${max} 
 
 /* ================== NAVEGACIÓN ================== */
 let VIEW='home';
-function go(v,arg){VIEW=v;window.scrollTo(0,0);KB=null;({home:vHome,theory:vTheory,practice:vPractice,result:vResult,quick:vQuick,badges:vBadges,review:startReview})[v](arg);}
+function go(v,arg){VIEW=v;window.scrollTo(0,0);KB=null;LCD=null;({home:vHome,theory:vTheory,practice:vPractice,result:vResult,quick:vQuick,badges:vBadges,review:startReview})[v](arg);}
 function nav(active){return `<nav class="tabs" aria-label="Secciones">${[['home','🏠','Inicio'],['quick','⚡','Reto 60 s'],['review','🔁','Repaso'],['badges','🏅','Logros']].map(([v,i,t])=>`<button data-go="${v}" class="${active===v?'on':''}"><span aria-hidden="true">${i}</span>${t}${v==='review'&&ST.mistakes.length?`<em>${ST.mistakes.length}</em>`:''}</button>`).join('')}</nav>`;}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b){e.preventDefault();go(b.dataset.go);}});
 
@@ -890,8 +920,8 @@ function vPractice(o){
   startEx();
 }
 function startEx(){
-  const ex=SESS.queue[SESS.i];
-  CUR={ex,tries:0,hint:0,input:'',failed:false,used:false,done:false,pi:0,partFails:0,ast:ex.ast?norm(clone(ex.ast)):null,lines:[],guided:ex.type==='steps'?ex.guided:false,stepTries:0,sel:[],showBar:false};
+  const ex=SESS.queue[SESS.i];LCD=null;
+  CUR={ex,tries:0,hint:0,input:'',failed:false,used:false,done:false,pi:0,partFails:0,ast:ex.ast?norm(clone(ex.ast)):null,lines:[],guided:ex.type==='steps'?ex.guided:false,stepTries:0,skipSub:null,sel:[],showBar:false};
   drawEx();
 }
 function practiceTitle(){return SESS.review?'Repaso de fallos':LBY[SESS.id].t;}
@@ -901,8 +931,7 @@ function drawEx(){
    <div class="topbar"><button class="x" id="quit" aria-label="Salir de la lección">✕</button><div class="prog" role="progressbar" aria-valuenow="${SESS.i}" aria-valuemax="${SESS.queue.length}"><i style="width:${prog}%"></i></div><span class="combo ${SESS.combo>=3?'hot':''}" title="Aciertos seguidos">🔥${SESS.combo}</span></div>
    <p class="ptitle">${practiceTitle()} · ${['Nivel fácil','Nivel medio','Nivel reto'][ex.L||0]}</p>
    <section class="excard" id="exc"></section>
-   <div id="fb" class="fbline" aria-live="polite"></div>
-   <section id="pad"></section></main>`;
+   <div class="dock"><div id="fb" class="fbline" aria-live="polite"></div><section id="pad"></section></div></main>`;
   $('#quit').onclick=()=>{const m=modal(`<h2 class="hand">¿Salir de la lección?</h2><p>Perderás el progreso de esta lección (la XP ganada se queda).</p><div class="row"><button class="btn" data-close>Seguir aquí</button><button class="btn warn" id="qy">Salir</button></div>`);m.el.querySelector('#qy').onclick=()=>{m.close();go('home');};};
   ({input:drawInput,mc:drawMC,order:drawOrder,steps:drawSteps,multi:drawMulti})[ex.type]();
 }
@@ -918,8 +947,8 @@ function pressKey(k){if(!KB||CUR&&CUR.done&&VIEW==='practice')return;let s=CUR.i
   if(/^\d$/.test(k)){if(s.replace(/[^\d]/g,'').length<10)s+=k;}
   else if(k==='del')s=s.slice(0,-1);
   else if(k==='neg')s=s.startsWith('-')?s.slice(1):'-'+s;
-  else if(k==='frac'){if(!KB.intOnly&&!s.includes('/')&&/\d$/.test(s))s+='/';}
-  else if(k==='ok'){KB.onOk();return;}
+  else if(k==='frac'){if(!(LCD?LCD.stage!=='simp':KB.intOnly)&&!s.includes('/')&&/\d$/.test(s))s+='/';}
+  else if(k==='ok'){(LCD?lcdCheck:KB.onOk)();return;}
   CUR.input=s;drawAns();}
 function drawAns(){const a=$('#ans');if(!a)return;const s=CUR.input;if(!s){a.innerHTML='<span class="ph">?</span>';return;}
   const ng=s.startsWith('-');const b=ng?s.slice(1):s;let h;
@@ -1005,10 +1034,17 @@ function drawSteps(){
     return;
   }
   const c=best(CUR.ast);CUR.cand=c;const rl=ruleLabel(c);const hints=stepHints(c);
+  const wantLCD=needsLCD(c)&&CUR.skipSub!==c.node.id;
+  if(wantLCD&&!LCD&&(ST.lcdHelp||CUR.forceSub===c.node.id)){lcdStart(sumVals(c.node),c.node.id,(res,info)=>lcdStepDone(c,res,info),true);return;}
+  if(LCD&&LCD.cid===c.node.id){
+    $('#exc').innerHTML=`<p class="prompt">${ex.prompt}</p><div class="notebook">${CUR.lines.map((l,i)=>`<div class="nl2 past">${i?'<span class="eq">=</span>':''}${l}</div>`).join('')}<div class="nl2 now">${CUR.lines.length?'<span class="eq">=</span>':''}${rd(CUR.ast,'top',hlOf(c))}</div></div><div id="lcd"></div>`;
+    if(!$('#pad').innerHTML){$('#pad').innerHTML=padH({small:true});bindPad(checkStep,false);}
+    lcdDraw();const nb=$('.notebook');if(nb)nb.scrollTop=nb.scrollHeight;return;}
   $('#exc').innerHTML=`<p class="prompt">${ex.prompt}</p>
    <div class="notebook">${CUR.lines.map((l,i)=>`<div class="nl2 past">${i?'<span class="eq">=</span>':''}${l}</div>`).join('')}<div class="nl2 now">${CUR.lines.length?'<span class="eq">=</span>':''}${rd(CUR.ast,'top',hlOf(c))}</div></div>
-   <div class="rule"><span class="ri" aria-hidden="true">${rl.ico}</span><span><b>Paso ${CUR.lines.length+1}:</b> calcula lo marcado. ${rl.where}<br><small>${rl.txt}</small></span></div>${hintBox(hints)}`;
+   <div class="rule"><span class="ri" aria-hidden="true">${rl.ico}</span><span><b>Paso ${CUR.lines.length+1}:</b> calcula lo marcado. ${rl.where}<br><small>${rl.txt}</small></span></div>${hintBox(hints,needsLCD(c)?'<button class="btn sm" id="toLCD">🧮 Desglosar: m.c.m. y convertir</button>':'')}`;
   bindHint(hints,()=>{drawSteps();});
+  const tl=$('#toLCD');if(tl)tl.onclick=()=>{CUR.forceSub=c.node.id;CUR.skipSub=null;drawSteps();};
   if(!$('#pad').innerHTML){$('#pad').innerHTML=padH({small:true});bindPad(checkStep,false);}
   const nb=$('.notebook');if(nb)nb.scrollTop=nb.scrollHeight;
 }
@@ -1022,7 +1058,7 @@ function checkStep(){
 }
 function advanceStep(c){
   CUR.lines.push(rd(CUR.ast,'top',hlOf(c)));CUR.ast=apply(CUR.ast,c);CUR.stepTries=0;CUR.hint=0;CUR.input='';ST.stats.steps++;
-  if(CUR.ast.t==='n'){CUR.lines.push(rd(CUR.ast));$('#exc').innerHTML=`<p class="prompt">Resultado:</p><div class="notebook">${CUR.lines.map((l,i)=>`<div class="nl2 ${i===CUR.lines.length-1?'res':'past'}">${i?'<span class="eq">=</span>':''}${l}</div>`).join('')}</div>`;finishEx(true,null);return;}
+  if(CUR.ast.t==='n'){CUR.lines.push(rd(CUR.ast));$('#exc').innerHTML=`<p class="prompt">Resultado:</p><div class="notebook">${CUR.lines.map((l,i)=>`<div class="nl2 ${i===CUR.lines.length-1?'res':'past'}">${i?'<span class="eq">=</span>':''}${l}</div>`).join('')}</div>`;{const nb=$('.notebook');if(nb)nb.scrollTop=nb.scrollHeight;}finishEx(true,null);return;}
   drawSteps();drawAns();
 }
 function checkFinal(){
@@ -1036,20 +1072,23 @@ function checkFinal(){
 
 /* --- tipo: problema por pasos --- */
 function drawMulti(){
-  const ex=CUR.ex;const p=ex.parts[CUR.pi];
+  const ex=CUR.ex;const p=ex.parts[CUR.pi];if(!p||CUR.done)return;
   $('#exc').innerHTML=`<div class="story">${ex.story}</div>${ex.data&&ex.data.length?`<div class="data"><b>Datos</b>${ex.data.map(d=>`<span>${d}</span>`).join('')}</div>`:''}
    ${ex.bar?`<button class="btn sm" id="barb">📊 ${CUR.showBar?'Ocultar dibujo':'Dibújalo'}</button>${CUR.showBar?`<div class="figwrap">${ex.bar}</div>`:''}`:''}
    <ol class="parts">${ex.parts.slice(0,CUR.pi).map(q=>`<li class="pdone"><span>${q.q}</span><b>${q.type==='mc'?q.opts[q.ok]:qH(red(q.ans))+(q.unit?' '+q.unit:'')}</b></li>`).join('')}
    <li class="pnow"><span>${p.q}</span>${p.type==='mc'?`<div class="opts">${p.opts.map((o,i)=>`<button class="opt ${(CUR.wrong||[]).includes(i)?'no':''}" data-i="${i}" ${(CUR.wrong||[]).includes(i)?'disabled':''}>${o}</button>`).join('')}</div>`:''}</li></ol>
-   ${ex.parts.length>1?`<p class="muted small">Paso ${CUR.pi+1} de ${ex.parts.length}</p>`:''}${hintBox(p.hints)}`;
+   ${LCD?'<div id="lcd"></div>':''}
+   ${ex.parts.length>1?`<p class="muted small">Paso ${CUR.pi+1} de ${ex.parts.length}</p>`:''}${LCD?'':hintBox(p.hints,p.sum?'<button class="btn sm" id="toLCD">🧮 Ayuda: denominador común</button>':'')}`;
   bindHint(p.hints,drawMulti);
+  const tl=$('#toLCD');if(tl)tl.onclick=()=>{lcdStart(p.sum.map(x=>x),'part'+CUR.pi,(res,info)=>{LCD=null;if(eqQ(res,p.ans)){if(info.failed)CUR.failed=true;CUR.used=CUR.used||info.failed;partDone(true);}else drawMulti();},false);};
   const bb=$('#barb');if(bb)bb.onclick=()=>{CUR.showBar=!CUR.showBar;drawMulti();};
   if(p.type==='mc'){$('#pad').innerHTML='';KB=null;$('#exc').querySelectorAll('.opt').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(i===p.ok)partDone(true);else{CUR.wrong=CUR.wrong||[];CUR.wrong.push(i);CUR.partFails++;CUR.failed=true;shake();beep(false);if(CUR.partFails>=2){fbMsg('La correcta era la marcada en verde.','bad');partDone(false);}else{drawMulti();fbMsg('No es esa. Revisa la pista.','bad');}}});}
   else if(!$('#ans')){$('#pad').innerHTML=padH({intOnly:p.intOnly,unit:p.unit});bindPad(checkPart,p.intOnly);}
   else{KB={onOk:checkPart,intOnly:p.intOnly};const fk=$('#pad [data-k="frac"]');if(fk)fk.disabled=!!p.intOnly;const un=$('#pad .unit');if(un)un.textContent=p.unit||'';else if(p.unit)$('#pad .ansbox').insertAdjacentHTML('beforeend',`<span class="unit">${p.unit}</span>`);}
+  if(LCD)lcdDraw();
 }
 function checkPart(){
-  const p=CUR.ex.parts[CUR.pi];const r=judgeIn(p.ans,p.reduce);if(r.st==='bad')return;
+  const p=CUR.ex.parts[CUR.pi];if(!p||CUR.done||CUR.wait)return;const r=judgeIn(p.ans,p.reduce);if(r.st==='bad')return;
   if(r.st==='reduce'){fbMsg('Valor correcto, pero <b>simplifícalo</b>.','warn');return;}
   if(r.st==='wrong'){CUR.partFails++;CUR.failed=true;shake();beep(false);if(CUR.partFails>=3){fbMsg(`Era <b>${qH(red(p.ans))}</b>. ${p.sol?'('+p.sol+')':''}`,'bad');partDone(false);return;}
     fbMsg(diagnose(r.u,p.ans,null)+` <span class="muted">(intento ${CUR.partFails} de 3)</span>`,'bad');CUR.input='';drawAns();return;}
@@ -1059,7 +1098,7 @@ function partDone(ok){
   const ex=CUR.ex;const p=ex.parts[CUR.pi];if(ok){fbMsg('✓ '+(p.sol||'Bien'),'good');beep(true);}
   CUR.pi++;CUR.partFails=0;CUR.hint=0;CUR.input='';CUR.wrong=[];
   if(CUR.pi>=ex.parts.length){const solH=`<ol class="parts">${ex.parts.map(q=>`<li class="pdone"><span>${q.q}</span><b>${q.sol||qH(q.ans)}</b></li>`).join('')}</ol>`;drawMultiFinal();finishEx(true,solH);return;}
-  setTimeout(()=>{drawMulti();drawAns();},ok?450:900);
+  CUR.wait=true;setTimeout(()=>{CUR.wait=false;if(!CUR.done&&CUR.ex.parts[CUR.pi]){drawMulti();drawAns();}},ok?450:900);
 }
 function drawMultiFinal(){const ex=CUR.ex;$('#exc').innerHTML=`<div class="story">${ex.story}</div><ol class="parts">${ex.parts.map(q=>`<li class="pdone"><span>${q.q}</span><b>${q.type==='mc'?q.opts[q.ok]:qH(red(q.ans))+(q.unit?' '+q.unit:'')}</b></li>`).join('')}</ol>`;}
 
@@ -1080,7 +1119,7 @@ function vResult(){
   app().querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openLesson(b.dataset.open));
   const ag=$('#again');if(ag)ag.onclick=()=>go('practice',{id:SESS.id});
   if(stars>=2||SESS.review)confetti();
-  if(PENDING_LVL){const l=PENDING_LVL;PENDING_LVL=0;setTimeout(()=>{confetti();modal(`<div class="center"><div class="lvup">${l}</div><h2 class="hand">¡Subes de nivel!</h2><p>Ahora eres <b>${lvlInfo(ST.xp).title}</b>.</p><button class="btn pri wide" data-close>¡Vamos!</button></div>`);},700);}
+  if(PENDING_LVL){const l=PENDING_LVL;PENDING_LVL=0;setTimeout(()=>{if(VIEW!=='result'){PENDING_LVL=l;return;}confetti();modal(`<div class="center"><div class="lvup">${l}</div><h2 class="hand">¡Subes de nivel!</h2><p>Ahora eres <b>${lvlInfo(ST.xp).title}</b>.</p><button class="btn pri wide" data-close>¡Vamos!</button></div>`);},700);}
 }
 
 /* ================== REPASO DE FALLOS ================== */
@@ -1102,7 +1141,7 @@ function vQuick(){
 function startQuick(){
   QZ={score:0,end:Date.now()+60000,q:gQuick()};CUR={input:'',done:false};
   app().innerHTML=`<main class="wrap prac"><div class="topbar"><button class="x" data-go="quick" aria-label="Salir">✕</button><div class="prog timer"><i id="tm" style="width:100%"></i></div><span class="combo hot" id="qsc">✓0</span></div>
-    <section class="excard" id="exc"></section><div id="fb" class="fbline" aria-live="polite"></div><section id="pad"></section></main>`;
+    <section class="excard" id="exc"></section><div class="dock"><div id="fb" class="fbline" aria-live="polite"></div><section id="pad"></section></div></main>`;
   $('#pad').innerHTML=padH({});bindPad(checkQuick,false);drawQuick();
   const tick=()=>{if(!QZ)return;const left=QZ.end-Date.now();const t=$('#tm');if(!t){QZ=null;return;}t.style.width=Math.max(0,left/600)+'%';if(left<=0){endQuick();return;}requestAnimationFrame(tick);};tick();
 }
@@ -1125,14 +1164,119 @@ function vBadges(){
    <h2 class="hand">Ajustes</h2><div class="settings">
     <label class="setrow"><span>Nombre</span><input class="txt sm" id="snm" value="${esc(ST.name)}" maxlength="20"></label>
     <label class="setrow"><span>Sonidos</span><input type="checkbox" id="ssd" ${ST.sound?'checked':''}></label>
+    <label class="setrow"><span>Ayuda de denominador común<small>Trocea las sumas de fracciones: m.c.m., convertir, operar y simplificar</small></span><input type="checkbox" id="slcd" ${ST.lcdHelp?'checked':''}></label>
     <label class="setrow"><span>Desbloquear todas las lecciones<small>Para familias y profes</small></span><input type="checkbox" id="sul" ${ST.unlockAll?'checked':''}></label>
     <button class="btn warn sm" id="srst">Borrar todo el progreso</button></div>
    <p class="muted small">El progreso se guarda en este navegador. Si cambias de dispositivo, empezarás de cero.</p></main>${nav('badges')}`;
   $('#snm').onchange=e=>{ST.name=e.target.value.trim().slice(0,20);save();};
   $('#ssd').onchange=e=>{ST.sound=e.target.checked;save();};
   $('#sul').onchange=e=>{ST.unlockAll=e.target.checked;save();};
+  $('#slcd').onchange=e=>{ST.lcdHelp=e.target.checked;save();};
   $('#srst').onclick=()=>{const m=modal(`<h2 class="hand">¿Borrar todo?</h2><p>Se perderán la XP, las estrellas, las medallas y los fallos guardados. No se puede deshacer.</p><div class="row"><button class="btn" data-close>Cancelar</button><button class="btn warn" id="ry">Borrar</button></div>`);m.el.querySelector('#ry').onclick=()=>{ST=DEF();save();m.close();window._asked=false;go('home');};};
 }
+
+
+/* ================== ASISTENTE DE DENOMINADOR COMÚN ================== */
+let LCD=null;
+function lcdStart(vals,cid,onDone,inSteps){
+  const dens=uniq(vals.map(v=>v.d).filter(d=>d>1)).sort((x,y)=>x-y);
+  LCD={vals,cid,onDone,inSteps,dens,L:lcmA(vals.map(v=>v.d)),stage:'mcm',ci:0,conv:[],S:null,g:1,tries:0,hint:0,failed:false,note:''};
+  CUR.input='';fbMsg('');
+  if(inSteps)drawSteps();else drawMulti();
+  drawAns();
+}
+function lcdHints(){
+  const C=LCD,L=C.L;
+  if(C.stage==='mcm'){const mx=C.dens[C.dens.length-1];
+    return['Busca el número más pequeño que esté en la tabla de multiplicar de <b>todos</b> los denominadores.'+(C.vals.some(v=>v.d===1)?' Los números enteros tienen denominador 1, así que no cuentan.':''),
+      `<table class="rej">${C.dens.map(d=>`<tr><th>Tabla del ${d}</th><td class="l">${multList(d,d===mx?L:Math.min(L,d*8),L)}${d!==mx&&L>d*8?', …':''}</td></tr>`).join('')}</table>`,
+      `Con factores primos: ${C.dens.map(d=>`${d} = ${factStr(d)}`).join(' &nbsp; ')}. Coge cada factor con su mayor exponente: m.c.m. = ${factStr(L)}.`];}
+  if(C.stage==='conv'){const v=C.vals[C.ci];const k=L/v.d;
+    return v.d===1?[`Un entero es una fracción con denominador 1: ${Math.abs(v.n)} = ${fR(Math.abs(v.n),1)}. ¿Por cuánto multiplico 1 para llegar a ${L}?`,`1 · ${L} = ${L}, así que arriba también: ${Math.abs(v.n)} · ${L}.`]
+      :[`¿Por cuánto multiplico ${v.d} para llegar a ${L}? Haz ${L} : ${v.d}.`,`${L} : ${v.d} = <b>${k}</b>. Lo que haces abajo, lo haces arriba: ${Math.abs(v.n)} · ${k}.`];}
+  if(C.stage==='sum'){const p=C.conv.filter(x=>x>0),n=C.conv.filter(x=>x<0).map(x=>-x);
+    return[`Ya tienen todas el mismo denominador (${L}). Ahora solo se operan los <b>numeradores</b>; el ${L} se queda abajo.`,
+      tbl([['Gano (+)',(p.join(' + ')||'0')+' = <b>'+p.reduce((x,y)=>x+y,0)+'</b>'],['Pierdo (−)',(n.join(' + ')||'0')+' = <b>'+n.reduce((x,y)=>x+y,0)+'</b>']])];}
+  if(C.stage==='mcd'){const a=Math.abs(C.S);const da=divisors(a),dl=divisors(L);
+    return['El m.c.d. es el número <b>más grande</b> que divide a los dos.',`<table class="rej"><tr><th>Divisores de ${a}</th><td class="l">${da.map(x=>dl.includes(x)?`<span class="hit">${x}</span>`:x).join(', ')}</td></tr><tr><th>Divisores de ${L}</th><td class="l">${dl.map(x=>da.includes(x)?`<span class="hit">${x}</span>`:x).join(', ')}</td></tr></table>Los marcados son comunes: ¿cuál es el mayor?`];}
+  return[`Divide el numerador y el denominador entre ${C.g}.`,`${fR(Math.abs(C.S)+' : '+C.g,L+' : '+C.g)}${C.S<0?' (y el signo − se queda)':''}`];
+}
+function lcdDraw(){
+  const C=LCD;const box=$('#lcd');if(!box)return;const L=C.L;const order=['mcm','conv','sum','mcd','simp'];const si=order.indexOf(C.stage);
+  const q='<span class="qbox">?</span>';
+  let h=`<div class="lcd"><div class="lcdh"><span>🧮 Denominador común</span><small>${['Paso 1 de 4: m.c.m.','Paso 2 de 4: convertir','Paso 3 de 4: operar','Paso 4 de 4: simplificar','Paso 4 de 4: simplificar'][si]}</small></div>`;
+  h+=`<div class="lrow ${si===0?'now':'done'}"><span>m.c.m.(${C.dens.join(', ')}) =</span>${si===0?q:`<b class="okv">${L}</b>`}</div>`;
+  if(si>=1)C.vals.forEach((v,i)=>{const sg=v.n<0?M:'';const doneV=i<C.conv.length;const now=si===1&&i===C.ci;if(si===1&&i>C.ci)return;
+    h+=`<div class="lrow ${now?'now':'done'}"><span class="num">${sg}${v.d===1?Math.abs(v.n):fR(Math.abs(v.n),v.d)}</span><span>=</span><span class="num">${sg}<span class="fr"><span>${doneV?`<b class="okv">${Math.abs(C.conv[i])}</b>`:q}</span><span>${L}</span></span></span>${now&&v.n<0?'<small class="muted">el signo se queda igual</small>':''}</div>`;});
+  if(si>=2){h+=`<div class="lrow ${si===2?'now':'done'}"><span class="num">${fR(numsExpr(C.conv),L)}</span><span>=</span><span class="num">${si===2?`<span class="fr"><span>${q}</span><span>${L}</span></span>`:qH(Q(C.S,L))}</span></div>`;}
+  if(si>=3){h+=`<div class="lrow ${si===3?'now':'done'}"><span>m.c.d.(${Math.abs(C.S)}, ${L}) =</span>${si===3?q:`<b class="okv">${C.g}</b>`}</div>`;}
+  if(si>=4){h+=`<div class="lrow now"><span class="num">${qH(Q(C.S,L))}</span><span>=</span>${q}<small class="muted">fracción irreducible</small></div>`;}
+  const hs=lcdHints();
+  h+=`<div class="hints">${hs.slice(0,C.hint).map((x,i)=>`<div class="hint"><span class="hn">Pista ${i+1}</span>${x}</div>`).join('')}</div><div class="hrow">${C.hint<hs.length?`<button class="btn sm" id="lhb">💡 ${C.hint?'Otra pista':'Pista'}</button>`:''}${C.inSteps?'<button class="btn sm ghost" id="lskip">⏩ Ya lo sé: pongo el resultado</button>':'<button class="btn sm ghost" id="lskip">Cerrar ayuda</button>'}</div></div>`;
+  box.innerHTML=h;
+  const hb=$('#lhb');if(hb)hb.onclick=()=>{C.hint++;CUR.used=true;lcdDraw();};
+  $('#lskip').onclick=()=>{const cid=C.cid;const inS=C.inSteps;LCD=null;CUR.input='';if(inS){CUR.skipSub=cid;CUR.forceSub=null;drawSteps();}else drawMulti();drawAns();};
+  const fk=$('#pad [data-k="frac"]');if(fk)fk.disabled=C.stage!=='simp';
+  ensureVisible(C.hint?box.querySelector('.hint:last-child'):box.querySelector('.lrow.now'));
+}
+function lcdNext(msg){const C=LCD;C.tries=0;C.hint=0;CUR.input='';fbMsg('✓ '+msg,'good');beep(true);
+  if(C.stage==='mcm'){C.stage='conv';C.ci=0;}
+  else if(C.stage==='conv'){C.ci++;if(C.ci>=C.vals.length)C.stage='sum';}
+  else if(C.stage==='sum'){C.g=gcd(Math.abs(C.S),C.L)||C.L;if(C.S===0){return lcdFinish(Q(0),'El resultado es 0.');}if(C.g>1)C.stage='mcd';else return lcdFinish(Q(C.S,C.L),`m.c.d.(${Math.abs(C.S)}, ${C.L}) = 1: ya es irreducible.`);}
+  else if(C.stage==='mcd'){C.stage='simp';}
+  else if(C.stage==='simp'){return lcdFinish(red(Q(C.S,C.L)),msg);}
+  lcdDraw();drawAns();
+}
+function lcdFinish(res,msg){const C=LCD;fbMsg('✓ '+msg,'good');C.onDone(res,{L:C.L,conv:C.conv,S:C.S,g:C.g,failed:C.failed});}
+function lcdFail(target,txt){const C=LCD;C.tries++;C.failed=true;shake();beep(false);
+  if(C.tries>=3){fbMsg(`Era <b>${txt}</b>. Sigamos.`,'bad');return true;}
+  return false;}
+function lcdCheck(){
+  const C=LCD;const s=CUR.input;const u=parseIn(s);if(!u){fbMsg('Escribe un número.','warn');return;}
+  const tryMsg=()=>` <span class="muted">(intento ${C.tries} de 3)</span>`;
+  if(C.stage==='mcm'){const n=u.n/u.d;
+    if(u.d===1&&n===C.L)return lcdNext(`m.c.m. = ${C.L}`);
+    if(u.d===1&&n>0&&C.dens.every(d=>n%d===0)){fbMsg(`${n} es múltiplo de todos, pero hay uno <b>más pequeño</b>. Con el más pequeño las cuentas son más fáciles.`,'warn');CUR.input='';drawAns();return;}
+    if(lcdFail(C.L,C.L))return lcdNext(`m.c.m. = ${C.L}`);
+    fbMsg(`${n} no está en la tabla de ${C.dens.filter(d=>n%d!==0).join(' ni del ')}.`+tryMsg(),'bad');CUR.input='';drawAns();return;}
+  if(C.stage==='conv'){const v=C.vals[C.ci];const ans=Math.abs(v.n)*C.L/v.d;
+    if(u.d===1&&Math.abs(u.n)===ans){C.conv.push(v.n<0?-ans:ans);return lcdNext(`${v.d===1?Math.abs(v.n):Math.abs(v.n)+'/'+v.d} = ${ans}/${C.L}`);}
+    if(lcdFail(ans,ans)){C.conv.push(v.n<0?-ans:ans);return lcdNext('Convertida');}
+    const k=C.L/v.d;fbMsg((u.d===1&&(u.n===Math.abs(v.n)+k||u.n===Math.abs(v.n)+C.L-v.d)?`Has <b>sumado</b>. Hay que <b>multiplicar</b>: ${Math.abs(v.n)} · ${k}.`:`Recuerda: ${C.L} : ${v.d} = ${k}. Multiplica el numerador por ${k}.`)+tryMsg(),'bad');CUR.input='';drawAns();return;}
+  if(C.stage==='sum'){const S=C.conv.reduce((x,y)=>x+y,0);
+    if(u.d===1&&u.n===S){C.S=S;return lcdNext(`${numsExpr(C.conv)} = ${ns(S)}`);}
+    if(u.d!==1&&eqQ(u,Q(S,C.L))){C.S=S;return lcdNext(`Resultado ${qT(Q(S,C.L))}`);}
+    if(lcdFail(S,ns(S))){C.S=S;return lcdNext('Seguimos');}
+    fbMsg((u.d===1&&u.n===-S?'El número está bien, pero <b>revisa el signo</b>.':'Opera solo los numeradores: junta lo que sumas y lo que restas.')+' Escribe solo el numerador.'+tryMsg(),'bad');CUR.input='';drawAns();return;}
+  if(C.stage==='mcd'){const n=u.n;
+    if(u.d===1&&n===C.g)return lcdNext(`m.c.d. = ${C.g}`);
+    if(u.d===1&&n>1&&Math.abs(C.S)%n===0&&C.L%n===0){fbMsg(`${n} divide a los dos, pero hay uno <b>más grande</b>.`,'warn');CUR.input='';drawAns();return;}
+    if(lcdFail(C.g,C.g))return lcdNext(`m.c.d. = ${C.g}`);
+    fbMsg(`${n} no divide a ${Math.abs(C.S)} y a ${C.L} a la vez.`+tryMsg(),'bad');CUR.input='';drawAns();return;}
+  const t=red(Q(C.S,C.L));
+  if(eqQ(u,t)&&isRed(u))return lcdNext(`Simplificada: ${qT(t)}`);
+  if(eqQ(u,t)){fbMsg('Vas bien, pero todavía se puede simplificar más.','warn');CUR.input='';drawAns();return;}
+  if(lcdFail(t,qT(t)))return lcdNext('Simplificada');
+  fbMsg((eqQ(u,neg(t))?'Revisa el signo.':`Divide arriba y abajo entre ${C.g}.`)+tryMsg(),'bad');CUR.input='';drawAns();
+}
+function lcdStepDone(c,res,info){
+  const L=info.L;LCD=null;
+  const eqNode=S(...c.node.terms.map(t=>[t.s,N(Q(t.n.v.n*L/t.n.v.d,L))]));
+  const hNode={t:'h',id:uid(),html:`<span class="num">${fR(numsExpr(info.conv),L)}</span>`};
+  CUR.lines.push(rd(CUR.ast,'top',hlOf(c)));
+  CUR.lines.push(rd(subst(CUR.ast,c.node.id,eqNode),'top',{id:eqNode.id}));
+  const hAst=subst(CUR.ast,c.node.id,hNode);
+  if(info.g>1&&info.S!==0){CUR.lines.push(rd(hAst,'top',{id:hNode.id}));const rawN=N(Q(info.S,L));CUR.ast=subst(CUR.ast,c.node.id,rawN);CUR.ast=norm(CUR.ast);
+CUR.lines.push(rd(CUR.ast,'top',{id:rawN.id}));CUR.ast=norm(subst(CUR.ast,rawN.id,N(res)));}
+  else{CUR.ast=norm(subst(CUR.ast,c.node.id,hNode));CUR.ast=norm(subst(CUR.ast,hNode.id,N(res)));CUR.lines.push(rd(hAst,'top',{id:hNode.id}));}
+  if(info.failed)CUR.failed=true;
+  CUR.stepTries=0;CUR.hint=0;CUR.input='';ST.stats.steps++;
+  if(CUR.ast.t==='n'){CUR.lines.push(rd(CUR.ast));$('#exc').innerHTML=`<p class="prompt">Resultado:</p><div class="notebook">${CUR.lines.map((l,i)=>`<div class="nl2 ${i===CUR.lines.length-1?'res':'past'}">${i?'<span class="eq">=</span>':''}${l}</div>`).join('')}</div>`;{const nb=$('.notebook');if(nb)nb.scrollTop=nb.scrollHeight;}finishEx(true,null);return;}
+  setTimeout(()=>{drawSteps();drawAns();},500);
+}
+
+function ensureVisible(el){if(!el)return;const d=document.querySelector('.dock');const lim=d?d.getBoundingClientRect().top:innerHeight;const r=el.getBoundingClientRect();
+  if(r.bottom>lim-8)window.scrollBy({top:r.bottom-lim+16,behavior:RM?'auto':'smooth'});else if(r.top<8)window.scrollBy({top:r.top-16,behavior:RM?'auto':'smooth'});}
 
 go('home');
 
