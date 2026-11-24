@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FAFBFD">
 <title>Misión Mates · 2º ESO</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>:root{color-scheme:light;
@@ -230,9 +232,45 @@ svg.bar{width:100%;max-width:560px}svg.bar rect{stroke:var(--ink);stroke-width:1
 .hit{background:var(--hy);color:var(--onhl);border-radius:4px;padding:0 3px;font-weight:900}
 .rej td.l{text-align:left;font-weight:600}
 .lcdbtn{margin-top:10px}
-</style></head>
+
+/* sincronización */
+.schip{font-size:.85rem;margin-left:4px}
+.sync p{margin:8px 0}.syst{font-weight:800}
+.code{font:900 clamp(1rem,5.2vw,1.35rem)/1.2 var(--body);letter-spacing:1px;white-space:nowrap;text-align:center;background:var(--paper);border:2px dashed var(--ink);border-radius:12px;padding:12px;user-select:all;font-variant-numeric:tabular-nums}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ============================================================
+   👉 PEGA AQUÍ LA CONFIGURACIÓN DE TU APP WEB DE FIREBASE
+   Consola de Firebase → ⚙️ Configuración del proyecto → General
+   → Tus apps → (app web) → "Configuración del SDK" → Config
+   Si lo dejas así, la app funciona igual pero sin sincronizar.
+   ============================================================ */
+window.FIREBASE_CONFIG = {const firebaseConfig = {
+
+  apiKey: "AIzaSyAZjGRXPGcnJXJp_AnxbJ1XmRWtiGMxeyg",
+
+  authDomain: "mision-mates-2-eso.firebaseapp.com",
+
+  databaseURL: "https://mision-mates-2-eso-default-rtdb.europe-west1.firebasedatabase.app",
+
+  projectId: "mision-mates-2-eso",
+
+  storageBucket: "mision-mates-2-eso.firebasestorage.app",
+
+  messagingSenderId: "129461728943",
+
+  appId: "1:129461728943:web:e06e6ddc4522df8dc0465a"
+
+};
+
+</script>
+</head>
 <body><div id="app"></div>
 <script>
+
 /* ================== MOTOR MATEMÁTICO ================== */
 const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -806,9 +844,10 @@ const ALL=WORLDS.flatMap(w=>w.lessons.map(l=>({...l,world:w})));
 const LBY=Object.fromEntries(ALL.map(l=>[l.id,l]));
 /* ================== ESTADO ================== */
 const KEY='misionMates2eso_v1';
-const DEF=()=>({name:'',xp:0,streak:0,lastDay:'',day:'',dayXP:0,lessons:{},badges:[],mistakes:[],stats:{ok:0,tot:0,steps:0,longs:0,probs:0,best60:0,reviewOk:0,maxCombo:0},unlockAll:false,sound:true,lcdHelp:true});
+const DEF=()=>({name:'',xp:0,streak:0,lastDay:'',day:'',dayXP:0,lessons:{},badges:[],mistakes:[],stats:{ok:0,tot:0,steps:0,longs:0,probs:0,best60:0,reviewOk:0,maxCombo:0},unlockAll:false,sound:true,lcdHelp:true,upd:0});
 let ST=(()=>{try{const s=JSON.parse(localStorage.getItem(KEY));return s?Object.assign(DEF(),s,{stats:Object.assign(DEF().stats,s.stats||{})}):DEF();}catch(e){return DEF();}})();
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(ST));}catch(e){}};
+const writeLocal=()=>{try{localStorage.setItem(KEY,JSON.stringify(ST));}catch(e){}};
+const save=()=>{ST.upd=Date.now();writeLocal();syncPush();};
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const yesterday=()=>{const d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const GOAL=60;
@@ -868,7 +907,7 @@ function vHome(){
   const greet=ST.dayXP>=GOAL?'Meta de hoy cumplida. ¿Un poco más?':ST.dayXP>0?`Te quedan ${GOAL-ST.dayXP} XP para la meta de hoy.`:'¿Empezamos la práctica de hoy?';
   app().innerHTML=`<main class="wrap home">
   <header class="hero">
-    <div><p class="brand">Misión Mates · 2º ESO</p><h1 class="hand">¡Hola${ST.name?', '+esc(ST.name):''}!</h1><p class="sub">${greet}</p></div>
+    <div><p class="brand">Misión Mates · 2º ESO ${syncChip()}</p><h1 class="hand">¡Hola${ST.name?', '+esc(ST.name):''}!</h1><p class="sub">${greet}</p></div>
     <div class="ring" title="Meta diaria"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" class="rbg"/><circle cx="32" cy="32" r="26" class="rfg" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}"/></svg><b>${ST.dayXP}</b><small>/${GOAL} XP</small></div>
   </header>
   <section class="statrow">
@@ -883,7 +922,8 @@ function vHome(){
   app().querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openLesson(b.dataset.open));
   if(!ST.name&&!window._asked){window._asked=true;askName();}
 }
-function askName(){const m=modal(`<h2 class="hand">¡Bienvenida a Misión Mates!</h2><p>Aquí practicarás <b>enteros y fracciones</b> paso a paso: teoría corta, ejercicios que van subiendo de nivel, pistas y medallas.</p><label class="lbl" for="nm">¿Cómo te llamas?</label><input id="nm" class="txt" maxlength="20" autocomplete="off" placeholder="Tu nombre"><button class="btn pri" id="nmok">Empezar</button>`);
+function askName(){const m=modal(`<h2 class="hand">¡Bienvenida a Misión Mates!</h2><p>Aquí practicarás <b>enteros y fracciones</b> paso a paso: teoría corta, ejercicios que van subiendo de nivel, pistas y medallas.</p><label class="lbl" for="nm">¿Cómo te llamas?</label><input id="nm" class="txt" maxlength="20" autocomplete="off" placeholder="Tu nombre"><button class="btn pri wide" id="nmok">Empezar</button>${SYNC.on?'<button class="btn ghost wide" id="nmsync">¿Ya la usas en otro dispositivo? Tengo un código</button>':''}`);
+  const sb=m.el.querySelector('#nmsync');if(sb)sb.onclick=()=>{m.close();askCode();};
   const inp=m.el.querySelector('#nm');setTimeout(()=>inp.focus(),50);const ok=()=>{ST.name=inp.value.trim().slice(0,20);save();m.close();vHome();};m.el.querySelector('#nmok').onclick=ok;inp.onkeydown=e=>{if(e.key==='Enter')ok();};}
 function openLesson(id){
   const l=LBY[id];if(!unlocked(id)){toast('🔒 Termina la lección anterior para desbloquear esta.');return;}const s=ST.lessons[id];
@@ -1161,6 +1201,7 @@ function vBadges(){
   const li=lvlInfo(ST.xp);const done=Object.keys(ST.lessons).length;
   app().innerHTML=`<main class="wrap"><h1 class="hand"><span class="mk">Tus logros</span></h1>
    <div class="rstats"><div><b>${li.l}</b><small>nivel</small></div><div><b>${ST.xp}</b><small>XP total</small></div><div><b>${done}/${ALL.length}</b><small>lecciones</small></div><div><b>${ST.stats.tot?Math.round(ST.stats.ok/ST.stats.tot*100):0}%</b><small>a la primera</small></div></div>
+   ${syncSection()}
    <h2 class="hand">Medallas</h2><div class="bgrid">${BADGES.map(b=>{const h=ST.badges.includes(b.id);return `<div class="bdg ${h?'on':''}"><span aria-hidden="true">${h?b.ico:'🔒'}</span><b>${b.t}</b><small>${b.d}</small></div>`;}).join('')}</div>
    <h2 class="hand">Ajustes</h2><div class="settings">
     <label class="setrow"><span>Nombre</span><input class="txt sm" id="snm" value="${esc(ST.name)}" maxlength="20"></label>
@@ -1168,12 +1209,13 @@ function vBadges(){
     <label class="setrow"><span>Ayuda de denominador común<small>Trocea las sumas de fracciones: m.c.m., convertir, operar y simplificar</small></span><input type="checkbox" id="slcd" ${ST.lcdHelp?'checked':''}></label>
     <label class="setrow"><span>Desbloquear todas las lecciones<small>Para familias y profes</small></span><input type="checkbox" id="sul" ${ST.unlockAll?'checked':''}></label>
     <button class="btn warn sm" id="srst">Borrar todo el progreso</button></div>
-   <p class="muted small">El progreso se guarda en este navegador. Si cambias de dispositivo, empezarás de cero.</p></main>${nav('badges')}`;
+   ${SYNC.on?'':'<p class="muted small">El progreso se guarda en este navegador. Si cambias de dispositivo, empezarás de cero.</p>'}</main>${nav('badges')}`;
+  bindSyncSection();
   $('#snm').onchange=e=>{ST.name=e.target.value.trim().slice(0,20);save();};
   $('#ssd').onchange=e=>{ST.sound=e.target.checked;save();};
   $('#sul').onchange=e=>{ST.unlockAll=e.target.checked;save();};
   $('#slcd').onchange=e=>{ST.lcdHelp=e.target.checked;save();};
-  $('#srst').onclick=()=>{const m=modal(`<h2 class="hand">¿Borrar todo?</h2><p>Se perderán la XP, las estrellas, las medallas y los fallos guardados. No se puede deshacer.</p><div class="row"><button class="btn" data-close>Cancelar</button><button class="btn warn" id="ry">Borrar</button></div>`);m.el.querySelector('#ry').onclick=()=>{ST=DEF();save();m.close();window._asked=false;go('home');};};
+  $('#srst').onclick=()=>{const m=modal(`<h2 class="hand">¿Borrar todo?</h2><p>Se perderán la XP, las estrellas, las medallas y los fallos guardados en este dispositivo. No se puede deshacer.${SYNC.code?' Además, este dispositivo se desvinculará de la sincronización (los otros conservan su progreso).':''}</p><div class="row"><button class="btn" data-close>Cancelar</button><button class="btn warn" id="ry">Borrar</button></div>`);m.el.querySelector('#ry').onclick=()=>{syncUnlink();ST=DEF();save();m.close();window._asked=false;go('home');};};
 }
 
 
@@ -1279,6 +1321,95 @@ CUR.lines.push(rd(CUR.ast,'top',{id:rawN.id}));CUR.ast=norm(subst(CUR.ast,rawN.i
 function ensureVisible(el){if(!el)return;const d=document.querySelector('.dock');const lim=d?d.getBoundingClientRect().top:innerHeight;const r=el.getBoundingClientRect();
   if(r.bottom>lim-8)window.scrollBy({top:r.bottom-lim+16,behavior:RM?'auto':'smooth'});else if(r.top<8)window.scrollBy({top:r.top-16,behavior:RM?'auto':'smooth'});}
 
+/* ================== SINCRONIZACIÓN ENTRE DISPOSITIVOS (Firebase) ================== */
+const SYNC_KEY='misionMates2eso_sync',DEV_KEY='misionMates2eso_dev';
+const SYNC={on:false,code:null,ref:null,unsub:null,status:'off',t:null};
+const DEVICE=(()=>{try{let d=localStorage.getItem(DEV_KEY);if(!d){d=uid()+uid();localStorage.setItem(DEV_KEY,d);}return d;}catch(e){return uid();}})();
+const CODE_ABC='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode=()=>{const r=new Uint32Array(16);crypto.getRandomValues(r);return Array.from(r,x=>CODE_ABC[x%32]).join('');};
+const fmtCode=c=>c.match(/.{1,4}/g).join('-');
+const cleanCode=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+function fbReady(){const c=window.FIREBASE_CONFIG;return typeof firebase!=='undefined'&&c&&c.apiKey&&!/PEGA/i.test(c.apiKey);}
+function mergeState(L,Rm){
+  if(!Rm)return L;const out=Object.assign(DEF(),L);const newer=(Rm.upd||0)>(L.upd||0)?Rm:L;
+  out.xp=Math.max(L.xp||0,Rm.xp||0);
+  out.lessons={...(L.lessons||{})};for(const[k,v]of Object.entries(Rm.lessons||{})){const x=out.lessons[k];out.lessons[k]=x?{stars:Math.max(x.stars||0,v.stars||0),runs:Math.max(x.runs||0,v.runs||0),perfect:!!(x.perfect||v.perfect)}:v;}
+  out.badges=uniq([...(L.badges||[]),...(Rm.badges||[])]);
+  out.seen={...(Rm.seen||{}),...(L.seen||{})};
+  out.stats={...DEF().stats};for(const k of Object.keys(out.stats))out.stats[k]=Math.max((L.stats||{})[k]||0,(Rm.stats||{})[k]||0);
+  if((Rm.lastDay||'')>(L.lastDay||'')){out.lastDay=Rm.lastDay;out.streak=Rm.streak||0;}else if(Rm.lastDay===L.lastDay)out.streak=Math.max(L.streak||0,Rm.streak||0);
+  if((Rm.day||'')>(L.day||'')){out.day=Rm.day;out.dayXP=Rm.dayXP||0;}else if(Rm.day===L.day)out.dayXP=Math.max(L.dayXP||0,Rm.dayXP||0);
+  out.mistakes=(newer.mistakes||[]).slice(0,40);
+  out.name=newer.name||L.name||Rm.name||'';
+  for(const k of ['sound','unlockAll','lcdHelp'])if(typeof newer[k]==='boolean')out[k]=newer[k];
+  out.upd=Math.max(L.upd||0,Rm.upd||0);
+  return out;
+}
+const sig=s=>{const c={...s};delete c.upd;return JSON.stringify(c,Object.keys(c).sort());};
+function applyRemote(rm){
+  if(!rm)return;const before=sig(ST);ST=mergeState(ST,rm);writeLocal();
+  if(sig(ST)!==sig(Object.assign(DEF(),rm)))syncPush();
+  if(sig(ST)!==before&&(VIEW==='home'||VIEW==='badges'))go(VIEW);
+}
+function syncPush(){if(!SYNC.ref)return;clearTimeout(SYNC.t);SYNC.t=setTimeout(pushNow,1200);}
+async function pushNow(){if(!SYNC.ref)return;clearTimeout(SYNC.t);
+  try{await SYNC.ref.set({st:JSON.parse(JSON.stringify(ST)),upd:firebase.firestore.FieldValue.serverTimestamp(),dev:DEVICE});if(navigator.onLine!==false)setSync('ok');}
+  catch(e){console.error('sync',e);setSync('error');}}
+function setSync(s){SYNC.status=s;const c=document.getElementById('syncchip');if(c)c.outerHTML=syncChip();const st=document.getElementById('syncstate');if(st)st.innerHTML=syncStateTxt();}
+async function syncInit(){
+  if(!fbReady())return;
+  try{firebase.initializeApp(window.FIREBASE_CONFIG);const db=firebase.firestore();try{await db.enablePersistence({synchronizeTabs:true});}catch(e){}
+    await firebase.auth().signInAnonymously();SYNC.on=true;SYNC.db=db;}
+  catch(e){console.error('firebase',e);SYNC.status='error';return;}
+  {const nm=document.querySelector('#nmok');if(nm&&!document.querySelector('#nmsync')){nm.insertAdjacentHTML('afterend','<button class="btn ghost wide" id="nmsync">¿Ya la usas en otro dispositivo? Tengo un código</button>');document.querySelector('#nmsync').onclick=()=>{document.querySelectorAll('.modal').forEach(x=>x.remove());askCode();};}}
+  window.addEventListener('online',()=>{if(SYNC.code){setSync('ok');pushNow();}});
+  window.addEventListener('offline',()=>{if(SYNC.code)setSync('offline');});
+  let code=null;try{code=localStorage.getItem(SYNC_KEY);}catch(e){}
+  const m=location.hash.match(/sync=([A-Za-z0-9-]{16,24})/);
+  if(m){const c=cleanCode(m[1]);history.replaceState(null,'',location.pathname+location.search);if(c!==code){document.querySelectorAll('.modal').forEach(x=>x.remove());const ok=await syncLink(c,true);toast(ok?'☁️ Dispositivo vinculado: tu progreso está sincronizado.':'No encuentro ese código.');if(ok){go('home');return;}}}
+  if(code)await syncLink(code,false);
+  if(VIEW==='home'||VIEW==='badges')go(VIEW);
+}
+async function syncLink(code,mustExist){
+  if(!SYNC.on)return false;code=cleanCode(code);if(code.length!==16)return false;
+  const ref=SYNC.db.collection('progreso').doc(code);
+  try{const snap=await ref.get();
+    if(snap.exists){ST=mergeState(ST,snap.data().st);writeLocal();}
+    else if(mustExist)return false;
+  }catch(e){console.error(e);if(mustExist)return false;}
+  if(SYNC.unsub)SYNC.unsub();
+  SYNC.code=code;SYNC.ref=ref;try{localStorage.setItem(SYNC_KEY,code);}catch(e){}
+  SYNC.unsub=ref.onSnapshot(s=>{if(!s.exists||s.metadata.hasPendingWrites)return;const d=s.data();if(d.dev!==DEVICE)applyRemote(d.st);if(navigator.onLine!==false)setSync('ok');},e=>{console.error(e);setSync('error');});
+  setSync(navigator.onLine===false?'offline':'ok');await pushNow();return true;
+}
+function syncUnlink(){if(SYNC.unsub)SYNC.unsub();SYNC.unsub=null;SYNC.ref=null;SYNC.code=null;try{localStorage.removeItem(SYNC_KEY);}catch(e){}setSync('off');}
+function syncStateTxt(){return({ok:'☁️ Sincronizado',offline:'📴 Sin conexión: se guardará al volver internet',error:'⚠️ No se pudo sincronizar (lo reintento solo)',off:'Solo en este dispositivo'})[SYNC.code?SYNC.status:'off']||'';}
+function syncChip(){if(!SYNC.on||!SYNC.code)return '<span id="syncchip"></span>';return `<span id="syncchip" class="schip s-${SYNC.status}" title="${syncStateTxt()}">${SYNC.status==='ok'?'☁️':SYNC.status==='offline'?'📴':'⚠️'}</span>`;}
+function syncLink2(){return location.origin+location.pathname+'#sync='+SYNC.code;}
+function syncSection(){
+  if(!SYNC.on)return '';
+  if(!SYNC.code)return `<h2 class="hand">Móvil y ordenador</h2><div class="settings sync"><p>Activa la sincronización para usar la app en varios dispositivos sin perder el avance. No hace falta cuenta ni contraseña: se usa un <b>código secreto</b>.</p>
+    <div class="col"><button class="btn pri wide" id="syon">Activar sincronización</button><button class="btn wide" id="sycode">Ya tengo un código de otro dispositivo</button></div></div>`;
+  return `<h2 class="hand">Móvil y ordenador</h2><div class="settings sync"><p id="syncstate" class="syst">${syncStateTxt()}</p>
+    <p>Tu código secreto:</p><div class="code">${fmtCode(SYNC.code)}</div>
+    <p class="muted small">En el otro dispositivo, abre el enlace o ve a Logros → «Ya tengo un código» y escríbelo. Guárdalo bien y no lo compartas: quien lo tenga puede ver y cambiar tu progreso.</p>
+    <div class="col"><button class="btn pri wide" id="sycopy">Copiar enlace para el otro dispositivo</button>${navigator.share?'<button class="btn wide" id="syshare">Enviar enlace…</button>':''}<button class="btn ghost wide" id="syoff">Desvincular este dispositivo</button></div></div>`;
+}
+function bindSyncSection(){
+  const on=$('#syon');if(on)on.onclick=async()=>{on.disabled=true;on.textContent='Activando…';await syncLink(newCode(),false);go('badges');toast('☁️ Sincronización activada');};
+  const cd=$('#sycode');if(cd)cd.onclick=askCode;
+  const cp=$('#sycopy');if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(syncLink2());toast('Enlace copiado. Ábrelo en el otro dispositivo.');}catch(e){toast(syncLink2(),4000);}};
+  const sh=$('#syshare');if(sh)sh.onclick=()=>navigator.share({title:'Misión Mates',text:'Abre este enlace para sincronizar mi progreso',url:syncLink2()}).catch(()=>{});
+  const off=$('#syoff');if(off)off.onclick=()=>{const m=modal(`<h2 class="hand">¿Desvincular este dispositivo?</h2><p>El progreso que hay aquí se queda, pero dejará de sincronizarse. Podrás volver a vincularlo con el código.</p><div class="row"><button class="btn" data-close>Cancelar</button><button class="btn warn" id="uy">Desvincular</button></div>`);m.el.querySelector('#uy').onclick=()=>{syncUnlink();m.close();go('badges');};};
+}
+function askCode(){
+  const m=modal(`<h2 class="hand">Vincular con un código</h2><p>Escribe el código que aparece en el otro dispositivo (Logros → Móvil y ordenador).</p><input id="cin" class="txt" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKLM-NPQR"><p id="cerr" class="fbline bad"></p><div class="row"><button class="btn" data-close>Cancelar</button><button class="btn pri" id="cok">Vincular</button></div>`);
+  const inp=m.el.querySelector('#cin');setTimeout(()=>inp.focus(),50);
+  const ok=async()=>{const c=cleanCode(inp.value);const er=m.el.querySelector('#cerr');if(c.length!==16){er.textContent='El código tiene 16 letras y números.';return;}
+    er.textContent='Buscando…';const r=await syncLink(c,true);if(!r){er.textContent='No encuentro ese código. Revísalo.';return;}m.close();toast('☁️ ¡Vinculado! Ya tienes tu progreso aquí.');go('home');};
+  m.el.querySelector('#cok').onclick=ok;inp.onkeydown=e=>{if(e.key==='Enter')ok();};
+}
 go('home');
+syncInit();
 
 </script></body></html>
